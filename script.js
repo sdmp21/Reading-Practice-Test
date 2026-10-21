@@ -1,6 +1,7 @@
 
-/* Replace this with your deployed Google Apps Script Web App URL */
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzZCl7L7_0aQNKp7yxfEod7VmljJQFD7Xey9vuca7Pzqolbht-rfgame56vYSf3_Gkx5A/exec";
+/* Google Apps Script Web App URL */
+const GOOGLE_SCRIPT_URL =
+  "https://script.google.com/macros/s/AKfycbzZCl7L7_0aQNKp7yxfEod7VmljJQFD7Xey9vuca7Pzqolbht-rfgame56vYSf3_Gkx5A/exec";
 
 const $ = (id) => document.getElementById(id);
 
@@ -13,8 +14,11 @@ let timerHandle = null;
 let largeText = false;
 let submitting = false;
 let submittedModules = [];
+let testFinished = false;
 
 const optionLetters = ["A", "B", "C", "D"];
+
+/* ---------- ANSWER HELPERS ---------- */
 
 function normalizeAnswer(value) {
   return String(value ?? "")
@@ -41,12 +45,26 @@ function answered(q) {
   return String(v ?? "").trim().length > prefix.length;
 }
 
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;"
+  })[c]);
+}
+
+/* ---------- EVENT LISTENERS ---------- */
+
 $("start-btn").addEventListener("click", startTest);
 $("prev-btn").addEventListener("click", () => moveQuestion(-1));
 $("next-btn").addEventListener("click", () => moveQuestion(1));
 $("review-btn").addEventListener("click", showReview);
 
 $("return-btn").addEventListener("click", () => {
+  if (testFinished || submittedModules.includes(moduleNo)) return;
+
   $("review-screen").hidden = true;
   $("test-screen").hidden = false;
   renderQuestion();
@@ -69,23 +87,29 @@ $("font-btn").addEventListener("click", () => {
 window.addEventListener("beforeunload", (e) => {
   if (
     studentName &&
+    !testFinished &&
     !submittedModules.includes(moduleNo) &&
-    !$("done-screen").hidden
+    !$("welcome-screen").hidden
   ) {
     return;
   }
 
   if (
     studentName &&
+    !testFinished &&
     !submittedModules.includes(moduleNo) &&
-    !$("welcome-screen").hidden === false
+    !$("test-screen").hidden
   ) {
     e.preventDefault();
     e.returnValue = "";
   }
 });
 
+/* ---------- START AND MODULE NAVIGATION ---------- */
+
 function startTest() {
+  if (testFinished) return;
+
   const name = $("student-name").value.trim();
 
   if (!name) {
@@ -94,16 +118,22 @@ function startTest() {
     return;
   }
 
+  $("name-error").hidden = true;
   studentName = name;
+
   $("welcome-screen").hidden = true;
+  $("review-screen").hidden = true;
+  $("done-screen").hidden = true;
   $("test-screen").hidden = false;
 
   beginModule(1);
 }
 
 function beginModule(num) {
-  // Remove any previous Continue button.
-  const oldContinueBtn = document.getElementById("continue-module-btn");
+  // Do not allow a finished test to restart.
+  if (testFinished || submittedModules.includes(num)) return;
+
+  const oldContinueBtn = $("continue-module-btn");
   if (oldContinueBtn) oldContinueBtn.remove();
 
   moduleNo = num;
@@ -114,9 +144,11 @@ function beginModule(num) {
   $("question-module").textContent =
     TEST_DATA[num].title.toUpperCase();
 
+  $("welcome-screen").hidden = true;
   $("review-screen").hidden = true;
   $("done-screen").hidden = true;
   $("test-screen").hidden = false;
+  $("confirm-modal").hidden = true;
 
   renderQuestion();
   updateTimer();
@@ -124,10 +156,11 @@ function beginModule(num) {
   if (timerHandle) clearInterval(timerHandle);
 
   timerHandle = setInterval(() => {
+    if (testFinished || submitting) return;
+
     secondsLeft--;
     updateTimer();
 
-    // Automatically submit when the timer reaches zero.
     if (secondsLeft <= 0) {
       clearInterval(timerHandle);
       timerHandle = null;
@@ -147,14 +180,20 @@ function updateTimer() {
     secondsLeft <= 60 ? "#ffb7a9" : "white";
 }
 
+/* ---------- RENDER QUESTIONS ---------- */
+
 function renderQuestion() {
+  if (testFinished || submittedModules.includes(moduleNo)) return;
+
   const q = currentQuestion();
 
   $("question-title").textContent =
     q.type === "text"
-      ? `Questions ${moduleNo === 1
-          ? (q.n <= 10 ? "1–10" : "11–20")
-          : "1–10"}`
+      ? `Questions ${
+          moduleNo === 1
+            ? (q.n <= 10 ? "1–10" : "11–20")
+            : "1–10"
+        }`
       : `Question ${q.n}`;
 
   $("question-module").textContent =
@@ -164,19 +203,22 @@ function renderQuestion() {
   const passage = currentModule().passages[q.p];
 
   $("passage-content").innerHTML = passage.html;
-  $("test-screen").classList.toggle("word-completion", q.type === "text");
+  $("test-screen").classList.toggle(
+    "word-completion",
+    q.type === "text"
+  );
   $("passage-content").classList.toggle("large-text", largeText);
   $("passage-kicker").textContent = passage.title.toUpperCase();
 
-  // Convert missing-word markers into inline letter boxes.
+  // Replace missing-word markers with letter boxes.
   currentModule().questions
-    .filter(item => item.type === "text" && item.p === q.p)
-    .forEach(item => {
+    .filter((item) => item.type === "text" && item.p === q.p)
+    .forEach((item) => {
       const marker = `[${item.n}]`;
-      const spans = [...$("passage-content").querySelectorAll(".slot")];
-      const slot = spans.find(
-        el => el.textContent.trim() === marker
-      );
+
+      const slot = [
+        ...$("passage-content").querySelectorAll(".slot")
+      ].find((el) => el.textContent.trim() === marker);
 
       if (!slot) return;
 
@@ -229,7 +271,7 @@ function renderQuestion() {
               name="answer"
               value="${letter}"
               ${selected ? "checked" : ""}
-            >
+            />
             <span class="option-letter">${letter}.</span>
             <span class="option-text">${escapeHTML(opt)}</span>
           </label>
@@ -239,8 +281,8 @@ function renderQuestion() {
 
     $("question-content").innerHTML = content;
 
-    document.querySelectorAll('input[name="answer"]').forEach(el => {
-      el.addEventListener("change", e => {
+    document.querySelectorAll('input[name="answer"]').forEach((el) => {
+      el.addEventListener("change", (e) => {
         answers[moduleNo][q.n] = e.target.value;
         renderQuestion();
       });
@@ -257,17 +299,16 @@ function renderQuestion() {
     `;
   }
 
-  // Restore answers and add keyboard support to inline boxes.
-  $("passage-content").querySelectorAll(".inline-word").forEach(wordEl => {
+  // Restore saved letters and keyboard controls.
+  $("passage-content").querySelectorAll(".inline-word").forEach((wordEl) => {
     const n = Number(wordEl.dataset.inlineWord);
 
     const item = currentModule().questions.find(
-      item => item.n === n
+      (item) => item.n === n
     );
 
     const prefix = item.prefix || "";
     const boxes = [...wordEl.querySelectorAll(".letter-box")];
-
     const savedWord = String(answers[moduleNo][n] ?? "");
 
     const suffix = savedWord
@@ -280,8 +321,7 @@ function renderQuestion() {
       box.value = (suffix[index] || "").slice(0, 1);
 
       box.addEventListener("input", () => {
-        const letters = boxes.map(b => b.value).join("");
-
+        const letters = boxes.map((b) => b.value).join("");
         answers[moduleNo][n] = (prefix + letters).trim();
 
         if (box.value && index < boxes.length - 1) {
@@ -292,12 +332,12 @@ function renderQuestion() {
         updateAnsweredCount();
       });
 
-      box.addEventListener("keydown", e => {
+      box.addEventListener("keydown", (e) => {
         if (e.key === "Backspace" && !box.value && index > 0) {
           boxes[index - 1].focus();
           boxes[index - 1].value = "";
 
-          const letters = boxes.map(b => b.value).join("");
+          const letters = boxes.map((b) => b.value).join("");
           answers[moduleNo][n] = (prefix + letters).trim();
 
           updatePalette();
@@ -315,7 +355,7 @@ function renderQuestion() {
         }
       });
 
-      box.addEventListener("paste", e => {
+      box.addEventListener("paste", (e) => {
         const paste = (e.clipboardData || window.clipboardData)
           .getData("text")
           .replace(/[^a-z]/gi, "");
@@ -328,7 +368,7 @@ function renderQuestion() {
           if (boxes[i]) boxes[i].value = letter;
         });
 
-        const letters = boxes.map(b => b.value).join("");
+        const letters = boxes.map((b) => b.value).join("");
         answers[moduleNo][n] = (prefix + letters).trim();
 
         const focusIndex = Math.min(
@@ -369,17 +409,11 @@ function renderQuestion() {
   }
 }
 
-function escapeHTML(s) {
-  return String(s).replace(/[&<>"']/g, c => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;"
-  }[c]));
-}
+/* ---------- QUESTION NAVIGATION ---------- */
 
 function moveQuestion(delta) {
+  if (testFinished || submittedModules.includes(moduleNo)) return;
+
   const next = currentIndex + delta;
 
   if (next < 0 || next >= currentModule().questions.length) return;
@@ -408,8 +442,10 @@ function updatePalette() {
     `;
   }).join("");
 
-  $("question-palette").querySelectorAll("button").forEach(btn => {
+  $("question-palette").querySelectorAll("button").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (testFinished || submittedModules.includes(moduleNo)) return;
+
       currentIndex = Number(btn.dataset.index);
       renderQuestion();
     });
@@ -421,7 +457,11 @@ function updateAnsweredCount() {
   $("answered-count").textContent = `${count} answered`;
 }
 
+/* ---------- REVIEW ---------- */
+
 function showReview() {
+  if (testFinished || submittedModules.includes(moduleNo)) return;
+
   $("test-screen").hidden = true;
   $("review-screen").hidden = false;
 
@@ -429,7 +469,7 @@ function showReview() {
     `Review ${currentModule().title}`;
 
   const missing = currentModule().questions.filter(
-    q => !answered(q)
+    (q) => !answered(q)
   ).length;
 
   $("review-description").textContent = missing
@@ -438,6 +478,7 @@ function showReview() {
 
   $("review-list").innerHTML = currentModule().questions.map((q, i) => `
     <button
+      type="button"
       class="review-item ${answered(q) ? "" : "missing"}"
       data-index="${i}"
     >
@@ -446,8 +487,10 @@ function showReview() {
     </button>
   `).join("");
 
-  $("review-list").querySelectorAll("button").forEach(btn => {
+  $("review-list").querySelectorAll("button").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (testFinished || submittedModules.includes(moduleNo)) return;
+
       currentIndex = Number(btn.dataset.index);
       $("review-screen").hidden = true;
       $("test-screen").hidden = false;
@@ -456,9 +499,15 @@ function showReview() {
   });
 }
 
+/* ---------- SUBMISSION CONFIRMATION ---------- */
+
 function openSubmitModal() {
+  if (testFinished || submitting || submittedModules.includes(moduleNo)) {
+    return;
+  }
+
   const unanswered = currentModule().questions.filter(
-    q => !answered(q)
+    (q) => !answered(q)
   ).length;
 
   $("confirm-message").textContent = unanswered
@@ -467,6 +516,8 @@ function openSubmitModal() {
 
   $("confirm-modal").hidden = false;
 }
+
+/* ---------- SCORING ---------- */
 
 function scoreModule(num) {
   const data = TEST_DATA[num];
@@ -482,7 +533,9 @@ function scoreModule(num) {
       scoredAnswered++;
     }
 
-    if (q.type === "mc" && response === q.answer) correct++;
+    if (q.type === "mc" && response === q.answer) {
+      correct++;
+    }
 
     if (
       q.type === "text" &&
@@ -499,6 +552,8 @@ function scoreModule(num) {
   };
 }
 
+/* ---------- GOOGLE SHEETS ---------- */
+
 async function postModule(num, autoSubmitted = false) {
   const score = scoreModule(num);
 
@@ -512,7 +567,7 @@ async function postModule(num, autoSubmitted = false) {
     score: score.correct,
     maxScore: score.max,
     scoredQuestionsAnswered: score.scoredAnswered,
-    answers: TEST_DATA[num].questions.map(q => ({
+    answers: TEST_DATA[num].questions.map((q) => ({
       questionNumber: q.n,
       answer: answers[num][q.n] ?? "",
       scored: q.scored,
@@ -524,10 +579,7 @@ async function postModule(num, autoSubmitted = false) {
     !GOOGLE_SCRIPT_URL ||
     GOOGLE_SCRIPT_URL.includes("PASTE_YOUR")
   ) {
-    console.warn(
-      "Google Apps Script URL is not configured.",
-      payload
-    );
+    console.warn("Google Apps Script URL is not configured.", payload);
     return { saved: false, score };
   }
 
@@ -541,18 +593,25 @@ async function postModule(num, autoSubmitted = false) {
       body: JSON.stringify(payload)
     });
 
-    // no-cors does not verify that Google Sheets saved the data.
+    // no-cors cannot confirm that Google Sheets saved the data.
     return { saved: true, score };
   } catch (err) {
-    console.error(err);
+    console.error("Submission error:", err);
     return { saved: false, score };
   }
 }
 
+/* ---------- SUBMIT MODULE ---------- */
+
 async function submitModule(autoSubmitted = false) {
-  if (submitting || submittedModules.includes(moduleNo)) return;
+  if (submitting || testFinished || submittedModules.includes(moduleNo)) {
+    return;
+  }
 
   submitting = true;
+
+  const thisModule = moduleNo;
+
   $("confirm-modal").hidden = true;
 
   if (timerHandle) {
@@ -565,14 +624,11 @@ async function submitModule(autoSubmitted = false) {
   $("review-screen").hidden = true;
   $("done-screen").hidden = false;
 
-  const thisModule = moduleNo;
-
   $("done-heading").textContent = autoSubmitted
     ? "Time is up!"
     : `Module ${thisModule} submitted`;
 
-  $("done-message").textContent =
-    "Your responses are being submitted.";
+  $("done-message").textContent = "Your responses are being submitted.";
 
   $("score-summary").innerHTML = `
     <div class="score-chip">
@@ -581,7 +637,17 @@ async function submitModule(autoSubmitted = false) {
     </div>
   `;
 
-  const result = await postModule(thisModule, autoSubmitted);
+  let result;
+
+  try {
+    result = await postModule(thisModule, autoSubmitted);
+  } catch (err) {
+    console.error(err);
+    result = {
+      saved: false,
+      score: scoreModule(thisModule)
+    };
+  }
 
   submittedModules.push(thisModule);
 
@@ -596,12 +662,12 @@ async function submitModule(autoSubmitted = false) {
     </div>
   `;
 
-  // Remove any stale Continue button.
-  const oldContinueBtn = document.getElementById("continue-module-btn");
+  const oldContinueBtn = $("continue-module-btn");
   if (oldContinueBtn) oldContinueBtn.remove();
 
   if (thisModule === 1) {
     $("done-heading").textContent = "Module 1 submitted";
+
     $("done-message").textContent = result.saved
       ? "Your Module 1 responses have been submitted. Continue when you are ready."
       : "Module 1 has been scored, but the Google Sheets save could not be confirmed.";
@@ -611,12 +677,25 @@ async function submitModule(autoSubmitted = false) {
     continueBtn.className = "primary-btn";
     continueBtn.textContent = "Continue to Module 2 →";
     continueBtn.style.marginTop = "12px";
-    continueBtn.addEventListener("click", () => beginModule(2));
+
+    continueBtn.addEventListener("click", () => {
+      if (testFinished) return;
+      beginModule(2);
+    });
 
     $("score-summary").after(continueBtn);
   } else {
-    // Final completion page. No Continue button after Module 2.
+    // FINAL SCREEN: do not restart or return to the test.
+    testFinished = true;
+
+    $("welcome-screen").hidden = true;
+    $("test-screen").hidden = true;
+    $("review-screen").hidden = true;
+    $("confirm-modal").hidden = true;
+    $("done-screen").hidden = false;
+
     $("done-heading").textContent = "Thank You!";
+
     $("done-message").textContent = result.saved
       ? "You have completed the TOEFL iBT Reading mock test. Your responses have been submitted."
       : "You have completed the TOEFL iBT Reading mock test. Your answers have been scored, but the Google Sheets save could not be confirmed. Please inform your tutor.";
@@ -632,6 +711,25 @@ async function submitModule(autoSubmitted = false) {
     `;
 
     $("score-summary").appendChild(totalChip);
+
+    // Disable all test navigation controls.
+    [
+      "start-btn",
+      "submit-btn",
+      "confirm-submit-btn",
+      "prev-btn",
+      "next-btn",
+      "review-btn",
+      "return-btn",
+      "yes-submit"
+    ].forEach((id) => {
+      const el = $(id);
+      if (el) el.disabled = true;
+    });
+
+    // Remove the Continue button if one remains.
+    const continueBtn = $("continue-module-btn");
+    if (continueBtn) continueBtn.remove();
   }
 
   $("yes-submit").disabled = false;
