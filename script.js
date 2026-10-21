@@ -45,6 +45,8 @@ function startTest(){
   beginModule(1);
 }
 function beginModule(num){
+  const oldContinueBtn = document.getElementById("continue-module-btn");
+  if (oldContinueBtn) oldContinueBtn.remove();
   moduleNo = num; currentIndex = 0; secondsLeft = TEST_DATA[num].minutes * 60;
   $("module-label").textContent = TEST_DATA[num].title;
   $("question-module").textContent = TEST_DATA[num].title.toUpperCase();
