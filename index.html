@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reading Practice Test</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">R</span><span>READING PRACTICE TEST</span></div>
+    <div class="topbar-right"><span id="module-label">Not started</span><span class="timer" id="timer">29:00</span></div>
+  </header>
+
+  <main id="welcome-screen" class="welcome-wrap">
+    <section class="welcome-card">
+      <p class="eyebrow">COMPUTER-BASED PRACTICE</p>
+      <h1>Reading Practice Test</h1>
+      <p class="intro">This practice test contains two modules. You can review and change answers while a module is active. When time expires, the module will be submitted automatically.</p>
+      <div class="module-summary">
+        <div><strong>Module 1</strong><span>35 questions · 20 minutes</span></div>
+        <div><strong>Module 2</strong><span>15 questions · 9 minutes</span></div>
+      </div>
+      <label for="student-name">Student's full name</label>
+      <input id="student-name" type="text" autocomplete="name" maxlength="120" placeholder="Enter your full name" required>
+      <p id="name-error" class="error" hidden>Please enter your full name to begin.</p>
+      <button id="start-btn" class="primary-btn">Begin test <span aria-hidden="true">→</span></button>
+      <p class="small-note">Your responses will be recorded when you submit each module. Please do not refresh or close the page during the test.</p>
+    </section>
+  </main>
+
+  <main id="test-screen" class="test-layout" hidden>
+    <section class="passage-panel">
+      <div class="panel-heading"><span id="passage-kicker">READING PASSAGE</span><button id="font-btn" class="quiet-btn" type="button" title="Toggle larger passage text">Aᴀ</button></div>
+      <div id="passage-content" class="passage-content"></div>
+    </section>
+    <section class="question-panel">
+      <div class="question-panel-top">
+        <div><p id="question-module" class="eyebrow">MODULE 1</p><h2 id="question-title">Question 1</h2></div>
+        <span id="answered-count" class="answered-count">0 answered</span>
+      </div>
+      <div id="question-content" class="question-content"></div>
+      <div class="question-nav">
+        <button id="prev-btn" class="secondary-btn">← Previous</button>
+        <button id="next-btn" class="primary-btn">Next →</button>
+      </div>
+    </section>
+    <footer class="bottom-nav">
+      <div id="question-palette" class="question-palette"></div>
+      <div class="bottom-actions"><span id="module-progress">Question 1 of 35</span><button id="review-btn" class="secondary-btn">Review module</button><button id="submit-btn" class="submit-btn">Submit module</button></div>
+    </footer>
+  </main>
+
+  <section id="review-screen" class="review-wrap" hidden>
+    <div class="review-card">
+      <p class="eyebrow">CHECK YOUR RESPONSES</p>
+      <h1 id="review-heading">Review Module 1</h1>
+      <p id="review-description">Unanswered questions are marked below. You can return to any question before submitting.</p>
+      <div id="review-list" class="review-list"></div>
+      <div class="review-actions"><button id="return-btn" class="secondary-btn">Return to test</button><button id="confirm-submit-btn" class="submit-btn">Submit module</button></div>
+    </div>
+  </section>
+
+  <section id="done-screen" class="welcome-wrap" hidden>
+    <div class="welcome-card result-card">
+      <div class="done-icon">✓</div>
+      <p class="eyebrow">MODULE SUBMITTED</p>
+      <h1 id="done-heading">Thank you</h1>
+      <p id="done-message">Your responses have been submitted.</p>
+      <div id="score-summary" class="score-summary"></div>
+      <p class="small-note">Your teacher will receive your submitted responses. Please wait for instructions before closing the page.</p>
+    </div>
+  </section>
+
+  <div id="confirm-modal" class="modal-backdrop" hidden>
+    <div class="modal">
+      <h2>Submit this module?</h2>
+      <p id="confirm-message">You will not be able to change your answers after submission.</p>
+      <div class="modal-actions"><button id="cancel-submit" class="secondary-btn">Keep working</button><button id="yes-submit" class="submit-btn">Submit now</button></div>
+    </div>
+  </div>
+  <script src="questions.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
