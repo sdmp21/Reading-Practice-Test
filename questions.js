@@ -22,7 +22,7 @@ const TEST_DATA = {
       {n:6,p:"golden",type:"text",prefix:"patt",stem:"Complete the missing word: ... changing weather ____ and disease ...",answer:"patterns",scored:true},
       {n:7,p:"golden",type:"text",prefix:"dise",stem:"Complete the missing word: ... weather patterns and ____ caused by a type of fungus ...",answer:"disease",scored:true},
       {n:8,p:"golden",type:"text",prefix:"b",stem:"Complete the missing word: ... disease caused ____ a type of fungus ...",answer:"by",scored:true},
-      {n:9,p:"golden",type:"text",prefix:"typ",stem:"Complete the missing word: ... caused by a ____ of fungus ...",answer:"type",scored:true},
+      {n:9,p:"golden",type:"text",prefix:"ty",stem:"Complete the missing word: ... caused by a ____ of fungus ...",answer:"type",scored:true},
       {n:10,p:"golden",type:"text",prefix:"tha",stem:"Complete the missing word: ... a type of fungus ____ attacks the skin of amphibians.",answer:"that",scored:true},
       {n:11,p:"insects",type:"text",prefix:"exh",stem:"Complete the missing word: Insects ____ a broad range of behaviors ...",answer:"exhibit",scored:false},
       {n:12,p:"insects",type:"text",prefix:"br",stem:"Complete the missing word: Insects exhibit a ____ range of behaviors ...",answer:"broad",scored:false},
